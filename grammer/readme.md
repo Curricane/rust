@@ -281,3 +281,75 @@ fn dangle() -> &String {
     &s
 }
 ```
+## 切片类型
+- 切片（Slice）是对数据值的部分引用
+- `..`表示范围的语法, 
+    - x..y 表示 [x, y) 的数学含义, 
+    - ..y 等价于 0..y, 
+    - x.. 等价于位置 x 到数据结束 
+    - .. 等价于位置 0 到结束
+- 被切片引用的字符串禁止更改其值
+```rust
+fn main() {
+    let arr = [1, 3, 5, 7, 9];
+    let part = &arr[0..3];
+    for i in part.iter() {
+        println!("{}", i);
+    }
+
+    let s = String::from("broadcast");
+    let part1 = &s[0..5];
+    let part2 = &s[5..9];
+}
+```
+## 结构体
+- 声明
+    ```rust
+    struct Site {
+        domain: String,
+        name: String,
+        nation: String,
+        found: u32
+    }
+    ```
+    - 不能声明实例，结尾不需要 ; 
+    - 每个字段定义之后用 , 分隔
+- 实例
+    - 实例化结构体的时候用 JSON 对象的 key: value 语法来实现定义
+        ```rust
+        let yunify = Site {
+            domain: String::from("www.yunify.com"),
+            name: String::from("yunify"),
+            nation: String::from("China"),
+            found: 2009
+        };
+        ```
+    - 正在实例化的结构体有字段名称和现存变量名称一样的，可以简化书写：
+        ```rust
+        let domain = String::from("www.yunify.com");
+        let y = Site {
+            domain, // 等同于 domain : domain,
+            name: String::from("yunify"),
+            nation: String::from("China"),
+            found: 2009
+        }
+        ```
+    - 你想要新建一个结构体的实例，其中大部分属性需要被设置成与现存的一个结构体属性一样，仅需更改其中的一两个字段的值，可以使用结构体更新语法;
+        ```rust
+        let site = Site {
+            domain: String::from("www.runoob.com"),
+            name: String::from("RUNOOB"),
+            ..runoob
+        };
+        ```
+        - ..runoob 后面不可以有逗号
+        - 这种语法不允许一成不变的复制另一个结构体实例，意思就是说至少重新设定一个字段的值才能引用其他实例的值
+#### 元组结构体
+元组的区别是它有名字和固定的类型格式。它存在的意义是为了处理那些需要定义类型（经常使用）又不想太复杂的简单数据：
+```rust
+struct Color(u8, u8, u8);
+struct Point(f64, f64);
+
+let black = Color(0, 0, 0);
+let origin = Point(0.0, 0.0);
+```
