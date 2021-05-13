@@ -41,6 +41,12 @@ fn main() {
 }
 ```
 ## 数据类型
+### 基本数据类型
+所有整数类型，例如 i32 、 u32 、 i64 等。  
+布尔类型 bool，值为 true 或 false 。  
+所有浮点类型，f32 和 f64。  
+字符类型 char。  
+仅包含以上类型数据的元组（Tuples）。  
 ### 布尔
 - 布尔型用 bool 表示，值只能为 true 或 false
 ### 字符
@@ -189,4 +195,89 @@ fn main() {
             i += 1;
         };
     }
+    ```
+## 所有权
+-  三大规则
+    - Rust 中的每个值都有一个变量，称为其所有者
+    - 一次只能有一个所有者
+    - 当所有者不在程序运行范围时，该值将被删除
+### 内存和分配
+Rust 之所以没有明示释放的步骤是因为在变量范围结束的时候，Rust 编译器自动添加了调用释放资源函数的步骤。
+### 变量数与数据交互的方式
+- 移动 Move
+    - 仅在栈中的数据的移动方式是直接复制
+        ```rust
+        let x = 5;
+        let y = x; 
+        // 此时 栈中有两个 5
+        ```
+    - 堆中的数据的移动方式，是把所有权移动给移动，如A移动给B，则移动后A没有所有权，失效了，不能再使用了
+        ```rust
+        let s1 = String::from("hello");
+        let s2 = s1; // 此时 s1 把字符串 hello 的所有权给了 s2，自己却失去了所有权
+        println!("{}, world", s1); // error s1 已经失效，名存实亡
+        ```
+        ![堆上所有权移动](./picture/堆上所有权移动.png)
+- 克隆 Clone
+    - 将数据单纯的复制一份以供他用
+    ```rust
+    fn main() {
+        let s1 = String::from("hello");
+        let s2 = s1.clone();
+        println!("s1 = {}, s2 = {}", s1, s2);
+    }
+    ```
+### 涉及函数的所有权机制
+- 如果把变量当做参数传入函数，那么它和移动的效果是一样的
+- 函数返回值的所有权机制
+```rust 
+fn main() {
+    let s1 = gives_ownership();
+    // gives_ownership 移动它的返回值到 s1
+
+    let s2 = String::from("hello");
+    // s2 被声明有效
+
+    let s3 = takes_and_gives_back(s2);
+    // s2 被当作参数移动, s3 获得返回值所有权
+} // s3 无效被释放, s2 被移动, s1 无效被释放.
+
+fn gives_ownership() -> String {
+    let some_string = String::from("hello");
+    // some_string 被声明有效
+
+    return some_string;
+    // some_string 被当作返回值移动出函数
+}
+
+fn takes_and_gives_back(a_string: String) -> String { 
+    // a_string 被声明有效
+
+    a_string  // a_string 被当作返回值移出函数
+}
+```
+### 引用与租借
+引用（Referrence）可以理解为变量的一个受限的别名，类似c++中的引用，引用就是租借引用对象的所有权.  
+当一个变量的值被引用时，变量本身不会被认定无效。因为"引用"并没有在栈中复制变量的值：  
+![引用](./picture/引用.png)
+- 引用的方式:  
+    - 不可变的引用 `let s2 = &s1;`
+    - 可变的引用 `let s2 = &mut s1;`
+- 需要注意的地方
+    - 当被引用的对象失去值的所有权，引用也失效
+    - 同时只能被租借一次
+    - 被租借后，租借失效之前，不能被移动
+    - 可以同时有多个读租借，同时只能有一个写租借
+#### 垂悬引用（Dangling References）
+"垂悬引用"在 Rust 语言里不允许出现，如果有，编译器会发现它  
+```rust
+fn main() {
+    let reference_to_nothing = dangle();
+}
+
+fn dangle() -> &String {
+    let s = String::from("hello");
+
+    &s
+}
 ```
