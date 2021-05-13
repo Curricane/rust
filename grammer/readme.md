@@ -140,3 +140,53 @@ fn main() {
     println("number is {}", number);
 }
 ```
+## 循环
+- while
+    ```rust
+    fn main() {
+        let mut n = 1;
+        while n != 4 {
+            println!("{}", n);
+            n += 1;
+        }
+        println!("EXIT");
+    }
+    ```
+- for in
+    ```rust
+    fn main() {
+        let a = [1,2,3,4,5];
+        for i in a.iter() {
+            println!("i is {}", i);
+        }
+
+        for i in 0..3 { // 0 1 2
+            println!("a[{}] = {}", i, a[i]);
+        }
+    }
+    ```
+- loop 
+    - 无限循环
+    - 通过 break 关键字类似于 return 一样使整个循环退出并给予外部一个返回值。
+    ```rust
+    fn main() {
+        let s = ['R', 'U', 'N', 'O', 'O', 'B'];
+        let mut i = 0;
+        loop {
+            let ch = s[i];
+            if ch == 'O' {
+                break;
+            }
+            println!("\'{}\'", ch);
+            i += 1;
+        }
+
+        let location = loop {
+            let ch = s[i];
+            if ch == 'O' {
+                break i; // 跳出循环，并返回一个值
+            } 
+            i += 1;
+        };
+    }
+```
