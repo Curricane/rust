@@ -81,7 +81,7 @@ f[0] = 4; // 正确
 - 需要具备参数必须声明参数名称和类型
 - 函数体的语句和表达式
     - 语句 Statement 是执行某些操作且**没有返回值**的步骤，往往以`;`结尾，如`let a = 6;`
-    - 表达式 Expression 有计算不走且**有返回值**，不以`;`结尾，如`a = 7`  `b + 2` `c * (a + b)`
+    - 表达式 Expression 有计算步骤且**有返回值**，不以`;`结尾，如`a = 7`  `b + 2` `c * (a + b)`
     - 表达式 加上`;`后就是语句
     - 可以用`{}`包括的块里编写一个较为复杂的表达式，其中 最后一行需要为表达式，而不是语句，即最后一行不能加`;`
         ```rust
@@ -312,7 +312,7 @@ fn main() {
         found: u32
     }
     ```
-    - 不能声明实例，结尾不需要 ; 
+    - 不能定义时同时声明实例，结尾不需要 ; 
     - 每个字段定义之后用 , 分隔
 - 实例
     - 实例化结构体的时候用 JSON 对象的 key: value 语法来实现定义
@@ -344,7 +344,7 @@ fn main() {
         ```
         - ..runoob 后面不可以有逗号
         - 这种语法不允许一成不变的复制另一个结构体实例，意思就是说至少重新设定一个字段的值才能引用其他实例的值
-#### 元组结构体
+### 元组结构体
 元组的区别是它有名字和固定的类型格式。它存在的意义是为了处理那些需要定义类型（经常使用）又不想太复杂的简单数据：
 ```rust
 struct Color(u8, u8, u8);
@@ -352,4 +352,64 @@ struct Point(f64, f64);
 
 let black = Color(0, 0, 0);
 let origin = Point(0.0, 0.0);
+println!("black = ({}, {}, {})", black.0, black.1, black.2);
 ```
+### 结构体所有权
+- 结构体失效的时候会释放所有字段
+- 结构体中可以定义引用型字段，这需要通过"生命周期"机制来实现
+### 输出结构体
+一定要导入调试库 #[derive(Debug)] ，之后在 println 和 print 宏中就可以用 {:?} 占位符输出一整个结构体
+```rust
+#[derive(Debug)]
+
+struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+fn main() {
+    let rect1 = Rectangle { width: 30, height: 50 };
+    println!("rect1 is {:?}", rect1);
+}
+```
+### 结构体方法
+方法（Method）和函数（Function）类似，只不过它是用来操作结构体实例的  
+结构体方法的第一个参数必须是 &self，不需声明类型，因为 self 不是一种风格而是关键字  
+- 先定义结构体，再通过 impl 关键字 定义结构体方法
+- **结构体 impl 块可以写几次， 效果相当于他们内容的拼接**
+```rust
+struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+impl Rectangle {
+    fn area(&self) -> u32 {
+        self.width * self.height
+    }
+}
+```
+### 结构体关联函数
+- 在 impl 块中，却没有 &self 参数
+- 这种函数不依赖实例，但使用时需要声明在哪个 impl 块中，类似于类方法，而不是实例方法
+- 使用时 结构体::关联方法
+```rust
+#[derive(Debug)]
+struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+impl Rectangle {
+    fn create(width: u32, height: u32) -> Rectangle {
+        Rectangle { width, height } // 没有以 ; 结尾，是表达式，可以最为返回值
+    }
+}
+
+fn main() {
+    let rect = Rectangle::create(30, 50);
+    println!("{:?}", rect);
+}
+```
+### 单元结构体
+结构体可以只作为一种象征而无需任何成员：`struct UnitStruct;`
