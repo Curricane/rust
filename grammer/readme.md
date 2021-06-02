@@ -734,3 +734,130 @@ fn main() {
     }
 }
 ```
+## 泛型
+- 泛型机制是编程语言用于表达类型抽象的机制，一般用于功能确定、数据类型待定的类，如链表、映射表等。
+### 函数中定义泛型
+1. 需要在函数名申明泛型，fn_name<T1, T2>
+2. 在使用到时候，用泛型类型
+```rust
+fn max<T>(array: &[T]) -> T {
+    let mut max_index = 0;
+    let mut i = 1;
+    while i < array.len() {
+        if array[i] > array[max_index] { // 泛型T 并不能进行 > 的比较，这里写时为了理解；实际实现，需要用到 特性 让T 能进行这样的比较
+            max_index = i;
+        }
+        i += 1;
+    }
+    array[max_index]
+}
+```
+### 结构体与枚举类中的泛型
+```rust
+struct Point<T1, T2> {
+    x: T1,
+    y: T2,
+}
+```
+- 方法也应该实现泛型的机制，否则泛型的类将无法被有效的方法操作
+- impl 关键字的后方必须有 <T>，因为它后面的 T 是以之为榜样的。但我们也可以为其中的一种泛型添加方法：
+```rust
+impl Point<f64> { // 只添加一种方法时，impl 后不需要 <T>
+    fn x(&self) -> f64 {
+        self.x
+    }
+}
+```
+- impl 块本身的泛型并没有阻碍其内部方法具有泛型的能力：
+```rust
+impl<T, U> Point<T, U> {
+    fn mixup<V, W>(self, other: Point<V, W>) -> Point<T, W> {
+        Point {
+            x: self.x,
+            y: other.y,
+        }
+    }
+}
+```
+- 使用泛型，要小心编译器不一定知道泛型支持哪些运算符和函数
+## 特性
+- 特性（trait）概念接近于 Java 中的接口（Interface），但两者不完全相同。特性与接口相同的地方在于它们都是一种行为规范，可以用于标识哪些类有哪些方法。
+- 声明
+```rust
+trait Descriptive {
+    fn describe(&self) -> String;
+}
+```
+- 实现 impl <特性名> for <所实现的类型名>
+```rust
+struct Person {
+    name: String,
+    age: u8
+}
+
+impl Descriptive for Person {
+    fn describe(&self) -> String {
+        format!("{} {}", self.name, self.age)
+    }
+}
+```
+- Rust 同一个类可以实现多个特性，每个 impl 块只能实现一个。
+### 默认特性
+- 这是特性与接口的不同点：接口只能规范方法而不能定义方法，但特性可以定义方法作为默认方法，因为是"默认"，所以对象既可以重新定义方法，也可以不重新定义方法使用默认的方法
+    - 声明的时候，实现一个方法
+```rust
+trait Descriptive {
+    fn describe(&self) -> String {
+        String::from("[Object]")
+    }
+}
+```
+### 特性做参数
+```rust
+fn output(object: impl Descriptive) {
+    println!("{}", object.describe());
+}
+
+fn output<T: Descriptive>(object: T) {
+    println!("{}", object.describe());
+}
+
+// 特性作类型表示时如果涉及多个特性，可以用 + 符号表示，例如
+fn notify(item: impl Summary + Display)
+fn notify<T: Summary + Display>(item: T)
+```
+- 复杂的实现关系可以使用 where 关键字简化，例如：
+```rust
+fn some_function<T, U>(t: T, u: U) -> i32
+    where T: Display + Clone,
+          U: Clone + Debug
+```
+### 特性做返回值
+```rust
+fn person() -> impl Descriptive {
+    Person {
+        name: String::from("Cali"),
+        age: 24
+    }
+}
+```
+- 同一函数中，不能反回不通类型实现的特性
+```rust
+// error
+fn some_function(bool bl) -> impl Descriptive {
+    if bl {
+        return A {};
+    } else {
+        return B {};
+    }
+}
+```
+### 有条件实现方法
+```rust
+// 这段代码声明了 A<T> 类型必须在 T 已经实现 B 和 C 特性的前提下才能有效实现此 impl 块。
+struct A<T> {}
+
+impl<T: B + C> A<T> {
+    fn d(&self) {}
+}
+```
