@@ -288,7 +288,7 @@ fn dangle() -> &String {
     - ..y 等价于 0..y, 
     - x.. 等价于位置 x 到数据结束 
     - .. 等价于位置 0 到结束
-- 被切片引用的字符串禁止更改其值
+- `被切片引用的字符串禁止更改其值`
 ```rust
 fn main() {
     let arr = [1, 3, 5, 7, 9];
@@ -302,6 +302,121 @@ fn main() {
     let part2 = &s[5..9];
 }
 ```
+## 枚举类
+### 申明
+```rust
+// 普通枚举
+enum Book {
+    Papery, Electronic
+}
+
+let book = Book::Papery;
+
+// 增加元组属性
+enum Book1 {
+    Papery(u32),
+    Electronic(String),
+}
+let book = Book1::Papery(1001);
+let ebook = Book1::Electronic(String::from("url://..."));
+
+// 为属性命名
+enum Book2 {
+    Papery { index: u32}, // 结构体语法，用大括号
+    Electronic { url: String},
+}
+
+let book = Book2::Paperty{index: 1001};
+// 虽然可以如此命名，但请注意，并不能像访问结构体字段一样访问枚举类绑定的属性。访问的方法在 match 语法中。
+```
+### match 语法
+- switch 语法很经典，但在 Rust 中并不支持，很多语言摒弃 switch 的原因都是因为 switch 容易存在因忘记添加 break 而产生的串接运行问题
+- Rust 通过 match 语句来实现分支结构
+```rust 
+fn main() {
+    enum Book {
+        Papery {index: u32},
+        Electronic {url: String},
+    }
+
+    let book = Book::Papery{index: 1001};
+    let ebook = Book::Electronic{url: String::from("www.yunify.com")};
+
+    match book {
+        Book::Papery {index } => {
+            println!("Papery Book {}", index);
+        },
+        Book::Electronic{url} => {
+            println!("E-book {}", url);
+        }
+    }
+}
+```
+- match 块也可以当作函数表达式来对待，它也是可以有返回值的：但是所有返回值表达式的类型必须一样！
+- 如果把枚举类附加属性定义成元组，在 match 块中需要临时指定一个名字
+```rust
+match 枚举类实例 {
+    分类1 => 返回值表达式,
+    分类2 => 返回值表达式,
+    ...
+}
+```
+- match 除了能够对枚举类进行分支选择以外，还可以对整数、浮点数、字符和字符串切片引用（&str）类型的数据进行分支选择。其中，`浮点数类型被分支选择虽然合法，但不推荐这样使用，因为精度问题可能会导致分支错误`。
+### Option枚举类
+- Option 是 Rust 标准库中的枚举类，这个类用于填补 Rust 不支持 null 引用的空白。
+```rust
+enum Option<T> {
+    Some(T),
+    None,
+}
+
+let opt = Option::Some("Hello");
+```
+- 如果你想针对 opt 执行某些操作，你必须先判断它是否是 Option::None：
+```rust 
+let opt = Option::Some("Hello");
+match opt {
+    Option::Some(something) => {
+        println!("{}", something);
+    },
+    Option::None => {
+        println!("opt is nothing");
+    }
+}
+```
+- 由于 Option 是 Rust 编译器默认引入的，在使用时可以省略 Option:: 直接写 None 或者 Some()
+```rust
+fn main() {
+    let t = Some(64);
+    match t {
+            Some(64) => println!("Yes"),
+            _ => println!("No"),
+    }
+}
+```
+### if let 语法
+- 语法
+```rust
+if let 匹配值 = 源变量 {
+    语句块
+}
+```
+- 使用例子
+```rust
+fn main() {
+    enum Book {
+        Papery(u32),
+        Electronic(String)
+    }
+    let book = Book::Electronic(String::from("url"));
+    if let Book::Papery(index) = book {
+        println!("Papery {}", index);
+    } else {
+        println!("Not papery book");
+    }
+}
+```
+- 需要注意的是，如果 if let 语句涉及到赋值成功，则对于非基础类型，需要小心所有权转移的问题
 ## 结构体
 - 声明
     ```rust
