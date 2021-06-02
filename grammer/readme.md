@@ -861,3 +861,44 @@ impl<T: B + C> A<T> {
     fn d(&self) {}
 }
 ```
+## Rust 声明周期
+- 主要是应对复杂类型系统中资源管理的问题
+- **引用**必须在值的生命周期以内才有效
+### 生命函数注释
+- 能够改变引用的生命周期，但可以在合适的地方声明两个引用的生命周期一致
+```rust
+&i32        // 常规引用
+&'a i32     // 含有生命周期注释的引用
+&'a mut i32 // 可变型含有生命周期注释的引用
+
+// 需要用泛型声明来规范生命周期的名称，随后函数返回值的生命周期将与两个参数的生命周期一致
+fn longer<'a>(s1: &'a str, s2: &'a str) -> &'a str {
+    if s2.len() > s1.len() {
+        s2
+    } else {
+        s1
+    }
+}
+```
+### 结构体中使用字符串切片引用
+```rust
+fn main() {
+    struct Str<'a> {
+        content: &'a str
+    }
+    let s = Str {
+        content: "string_slice"
+    };
+    println!("s.content = {}", s.content);
+}
+
+impl<'a> Str<'a> {
+    fn get_content(&self) -> &str { // 返回值也可以加上声明周期
+        self.content
+    }
+}
+```
+### 静态声明周期
+- `'static`
+- 所有用双引号包括的字符串常量所代表的精确数据类型都是 &'static str 
+- `'static` 所表示的生命周期从程序运行开始到程序运行结束。
