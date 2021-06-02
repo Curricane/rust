@@ -417,6 +417,16 @@ fn main() {
 }
 ```
 - 需要注意的是，如果 if let 语句涉及到赋值成功，则对于非基础类型，需要小心所有权转移的问题
+    - 但可以通过 引用的 方式来解决该问题
+    ```rust
+    let book = Book1::Electronic(String::from("url:www.yunify.com"));
+    if let Book1::Electronic(url) = &book { // 能够匹配上，会涉及到赋值，使用&book引用的方式，避免book被移动
+        println!("Papery {}", url);
+    } else {
+        println!("Not papery book");
+    }
+    println!("book: {:?}", book);
+    ```
 ## 结构体
 - 声明
     ```rust
