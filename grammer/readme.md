@@ -538,3 +538,119 @@ fn main() {
 ```
 ### 单元结构体
 结构体可以只作为一种象征而无需任何成员：`struct UnitStruct;`
+## Rust 组织管理
+- Rust 中有三个重要的组织概念：箱、包、模块
+### 箱（Crate）
+- "箱"是二进制程序文件或者库文件，存在于"包"中。
+- "箱"是树状结构的，它的树根是编译器开始运行时编译的源文件所编译的程序。
+### 包（Package）
+- 当我们使用 Cargo 执行 new 命令创建 Rust 工程时，工程目录下会建立一个 Cargo.toml 文件。工程的实质就是一个包，包必须由一个 Cargo.toml 文件来管理，该文件描述了包的基本信息以及依赖项。
+- 一个包最多包含一个库"箱"，可以包含任意数量的二进制"箱"，但是至少包含一个"箱"（不管是库还是二进制"箱"）。
+- 当使用 cargo new 命令创建完包之后，src 目录下会生成一个 main.rs 源文件，Cargo 默认这个文件为二进制箱的根，编译之后的二进制箱将与包名相同
+### 模块（Module）
+- Rust 中的组织单位是模块（Module）
+```rust
+mod nation {
+    mod government {
+        fn govern() {}
+    }
+    mod congress {
+        fn legislate() {}
+    }
+    mod court {
+        fn judicial() {}
+    }
+}
+// 我们可以把它转换成树状结构：
+nation
+ ├── government
+ │ └── govern
+ ├── congress
+ │ └── legislate
+ └── court
+   └── judicial
+```
+- Rust 中的路径分隔符是 ::
+#### 访问权限
+- Rust 中有两种简单的访问权：公共（public）和私有（private）。
+- 默认情况下，如果不加修饰符，模块中的成员访问权将是私有的。
+- 如果想使用公共权限，需要使用 pub 关键字
+- 对于私有的模块，只有在与其平级的位置或下级的位置才能访问，不能从其外部访问。
+```rust
+mod nation { // priv
+    pub mod government { // pub
+        pub fn govern() { // pub
+            println!("govern");
+        }
+    }
+
+    mod congress { // priv
+        pub fn legislate() { // pub
+            println!("nation::congress::legislate")
+        }
+    }
+
+    mod court { // priv
+        fn judicail() { // priv
+            super::congress::legislate(); //使用了 super, congress::legislate() 是pub，因此可以被使用
+        }
+    }
+
+    mod test {
+        fn test() {
+            // super::court::judicail(); // 使用了 super, court::judicail() 是priv，因此不可以被使用
+        }
+    }
+
+    fn test1() {
+        // court::judicail(); // 调用了同级mod是ok的，但不能调用它的priv函数
+    }
+}
+
+fn main() {
+    nation::government::govern();
+    // nation::congress::legislate(); // priv 不能被外部使用
+    // nation::court::judicail(); // priv 不能被外部使用
+}
+```
+- 枚举类枚举项可以内含字段，但不具备类似的性质:
+- `每一级 mod 就如一个文件夹，嵌套的 mod 就是子文件夹; 同一文件夹下，是可以发现同一级的mod，不同文件夹下，能否发现，取决于是否有pub属性`
+- 如果模块中定义了结构体，结构体除了其本身是私有的以外，其字段也默认是私有的
+- 每一个 Rust 文件的内容都是一个"难以发现"的模块；即文件名本身是一个mod
+```rust
+// main.rs
+mod second_module;
+
+fn main() {
+    println!("This is the main module.");
+    println!("{}", second_module::message()); // 这里，使用文件名::方法进行调用，即文件本身是一层mod
+}
+
+// second_module.rs
+pub fn message() -> String {
+    String::from("This is the 2nd module.")
+}
+```
+### use 关键字
+- use 关键字能够将模块标识符引入当前作用域，解决了局部模块路径过长的问题
+- 有些情况下存在两个相同的名称，且同样需要导入，我们可以使用 as 关键字为标识符添加别名
+- use 关键字可以与 pub 关键字配合使用：
+```rust
+mod nation {
+    pub mod government {
+        pub fn govern() {}
+    }
+    pub fn govern() {}
+}
+   
+use crate::nation::government::govern;
+use crate::nation::govern as nation_govern;
+
+fn main() {
+    nation_govern();
+    govern();
+}
+```
+### 引用标准库
+- `use std::`
+    - use std::f64::consts::PI;
