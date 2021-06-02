@@ -654,3 +654,83 @@ fn main() {
 ### 引用标准库
 - `use std::`
     - use std::f64::consts::PI;
+## 错误处理
+- Rust 有一套独特的处理异常情况的机制，它并不像其它语言中的 try 机制那样简单
+- 程序中一般会出现两种错误：
+    - 可恢复错误
+        - 可恢复错误用 Result<T, E> 类来处理
+    - 不可恢复错误
+        - 不可恢复错误使用 panic! 宏来处理
+### 可恢复的错误
+- 在 Rust 中通过 Result<T, E> 枚举类作返回值来进行异常表达：
+```rust
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+```
+- 如果想使一个可恢复错误按不可恢复错误处理，Result 类提供了两个办法
+    - unwrap()
+    - expect(message: &str) 
+    ```rust
+    use std::fs::File;
+
+    fn main() {
+        let f1 = File::open("hello.txt").unwrap();
+        let f2 = File::open("hello.txt").expect("Failed to open.");
+    }
+    ```
+    - 这段程序相当于在 Result 为 Err 时调用 panic! 宏。两者的区别在于 expect 能够向 panic! 宏发送一段指定的错误信息。
+### 可恢复的错误的传递
+- Rust 中可以在 Result 对象后添加 ? 操作符将同类的 Err 直接传递出去(语法糖)
+```rust
+fn f(i: i32) -> Result<i32, bool> {
+    if i >= 0 { Ok(i) }
+    else { Err(false) }
+}
+
+fn g(i: i32) -> Result<i32, bool> {
+    let t = f(i)?;
+    Ok(t) // 因为确定 t 不是 Err, t 在这里已经是 i32 类型
+}
+
+fn main() {
+    let r = g(10000);
+    if let Ok(v) = r {
+        println!("Ok: g(10000) = {}", v);
+    } else {
+        println!("Err");
+    }
+}
+```
+### kind 方法
+- 判断 Result 的 Err 类型，获取 Err 类型的函数是 kind()
+```rust
+use std::io;
+use std::io::Read;
+use std::fs::File;
+
+fn read_text_from_file(path: &str) -> Result<String, io::Error> {
+    let mut f = File::open(path)?;
+    let mut s = String::new();
+    f.read_to_string(&mut s)?;
+    Ok(s)
+}
+
+fn main() {
+    let str_file = read_text_from_file("hello.txt");
+    match str_file {
+    Ok(s) => println!("{}", s),
+    Err(e) => {
+        match e.kind() {
+            io::ErrorKind::NotFound => {
+                println!("No such file");
+            },
+            _ => {
+                println!("Cannt read the file");
+            }
+        }
+    }
+    }
+}
+```
