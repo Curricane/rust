@@ -36,8 +36,15 @@
   - [2.7. 复合数据类型](#27-复合数据类型)
     - [2.7.1. 元组](#271-元组)
     - [2.7.2. 结构体](#272-结构体)
-    - [枚举体](#枚举体)
-  - [常用集合类型](#常用集合类型)
+    - [2.7.3. 枚举体](#273-枚举体)
+  - [2.8. 常用集合类型](#28-常用集合类型)
+    - [2.8.1. 线性序列：Vec](#281-线性序列vec)
+    - [2.8.2. 线性序列：双端队列](#282-线性序列双端队列)
+    - [2.8.3. 线性序列：链表](#283-线性序列链表)
+    - [2.8.4. Key-Value映射表：HashMap和BTreeMap](#284-key-value映射表hashmap和btreemap)
+    - [2.8.5. 集合：HashSet和BTreeSet](#285-集合hashset和btreeset)
+    - [2.8.6. 优先队列：BinaryHeap](#286-优先队列binaryheap)
+  - [智能指针](#智能指针)
 # 1. 新时代的语言
 # 2. 语言精要
 ## 2.1. Rust 语言的基本构成
@@ -494,7 +501,7 @@ fn main() {
 -  结构体上方的＃[derive（Debug，PartialEq）]是属性，可以让结构体自动实现Debug trait和PartialEq trait，它们的功能是允许对结构体实例进行打印和比较
 -  在impl块中定义的函数被称为方法，这和面向对象有点渊源
 
-### 枚举体
+### 2.7.3. 枚举体
 - 枚举体（Enum，也可称为枚举类型或枚举），顾名思义，该类型包含了全部可能的情况，可以有效地防止用户提供无效值
 - 三类
   - 无参数枚举体
@@ -538,9 +545,122 @@ fn test3 () {
     let home = IpAddr::V4(127, 0, 0, 1);
 }
 ```
-## 常用集合类型
+## 2.8. 常用集合类型
 - 在Rust标准库std::collections模块下有4种通用集合类型
   - 线性序列：向量（Vec）、双端队列（VecDeque）、链表（LinkedList）
   - Key-Value映射表：无序哈希表（HashMap）、有序哈希表（BTreeMap）
   - 集合类型：无序集合（HashSet）、有序集合（BTreeSet）
   - 优先队列：二叉堆（BinaryHeap）
+
+### 2.8.1. 线性序列：Vec
+- 向量也是一种数组，和基本数据类型中的数组的区别在于，**向量可动态增长**
+  ```rsut
+  fn main() {
+      let mut v1 = vec![]; // 初始化方式一
+      v1.push(1);
+      v1.push(2);
+      v1.push(3);
+      assert_eq!(v1, [1, 2, 3]);
+      assert_eq!(v1[1], 2);
+
+      let mut v2 = vec![0; 10]; // 初始化方式二
+      println!("v2 is: {:?}", v2); // v2 is: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      
+      let mut v3 = Vec::new(); // 初始化方式三
+      v3.push(4);
+      v3.push(5);
+      v3.push(6);
+      // v3[4]; // error: index out of bounds
+  }
+  ```
+- vec！是一个宏，用来创建向量字面量。
+  - 宏语句可以使用圆括号，也可以使用中括号和花括号，一般使用中括号来表示数组。
+- Rust对向量和数组都会做越界检查，以保证安全
+
+### 2.8.2. 线性序列：双端队列
+- Rust中的VecDeque是基于可增长的RingBuffer算法实现的双端队列
+- 需要通过 use 关键字引入 std::collections::VecDeque，因为VecDeque＜T＞并不会像Vec＜T＞那样被自动引入
+```rust
+use std::collections::VecDeque;
+
+fn main() {
+    let mut buf = VecDeque::new();
+    buf.push_front(1);
+    buf.push_front(2);
+    assert_eq!(buf.get(0), Some(&2));
+    assert_eq!(buf.get(1), Some(&1));
+    buf.push_back(3);
+    buf.push_back(4);
+    buf.push_back(5);
+    println!("buf is:{:?}", buf); // buf is:[2, 1, 3, 4, 5]
+}
+```
+### 2.8.3. 线性序列：链表
+- Rust提供的链表是双向链表，允许在任意一端插入或弹出元素
+- **通常最好使用Vec或VecDeque类型，因为它们比链表更加快速，内存访问效率更高，并且可以更好地利用CPU缓存**
+- use 显示引入 std::collections::LinkedList;
+```rust
+use std::collections::LinkedList;
+fn main() {
+    let mut l1 = LinkedList::new();
+    l1.push_back('a');
+    let mut l2 = LinkedList::new();
+    l2.push_back('b');
+    l2.push_back('c');
+    l1.append(&mut l2);
+    println!("l1: {:?}", l1); // l1: ['a', 'b', 'c']
+    println!("l2: {:?}", l2); // l2: [] 
+    let a = l1.pop_front();
+    match a {
+        Some(x) => println!("a is: {}", x), // a is: a
+        None => println!("get nill"),
+    }
+    println!("after pop_front: {:?}", l1); // after pop_front: ['b', 'c']
+}
+```
+- append 的时候注意所有权的转移
+
+### 2.8.4. Key-Value映射表：HashMap和BTreeMap
+- Key必须是可哈希的类型，Value必须是在编译期已知大小的类型
+- HashMap是无序的，BTreeMap是有序的
+- 需要引入 包
+```rust
+use std::collections::BTreeMap;
+use std::collections::HashMap;
+
+fn main() {
+    let mut hmap = HashMap::new();
+    let mut bmap = BTreeMap::new();
+
+    hmap.insert(3, "c");
+    hmap.insert(1, "a");
+    hmap.insert(2, "b");
+    hmap.insert(5, "e");
+    hmap.insert(4, "d");
+
+    bmap.insert(3, "c");
+    bmap.insert(1, "a");
+    bmap.insert(2, "b");
+    bmap.insert(5, "e");
+    bmap.insert(4, "d");
+
+    println!("hmap: {:?}", hmap); // hmap: {5: "e", 3: "c", 4: "d", 2: "b", 1: "a"}
+    println!("bmap: {:?}", bmap); // bmap: {1: "a", 2: "b", 3: "c", 4: "d", 5: "e"}
+}
+```
+### 2.8.5. 集合：HashSet和BTreeSet
+HashSet＜K＞和BTreeSet＜K＞其实就是HashMap＜K，V＞和BTreeMap＜K，V＞把Value设置为空元组的特定类型，等价于`HashSet<K, ()>` 和 `BTreeSet<K，（）>`
+- 集合中的元素应该是唯一的，因为是Key-Value映射表的Key
+- 集合中的元素应该都是可哈希的类型
+- HashSet应该是无序的，BTreeSet应该是有序
+
+### 2.8.6. 优先队列：BinaryHeap
+Rust提供的优先队列是基于二叉最大堆（Binary Heap）实现的
+
+## 智能指针
+- Rust 中的值默认被分配到栈内存
+- 可以通过 Box ＜T＞将值装箱（在堆内存中分配）；
+  - Box＜T＞是指向类型为T的堆内存分配值的智能指针
+  - 当Box＜T＞超出作用域范围时，将调用其析构函数，销毁内部对象，并自动释放堆中的内存
+  - 可以通过解引用操作符来获取Box＜T＞中的T
+  - Box＜T＞的行为像引用，并且可以自动释放内存，所以我们称其为智能指针
