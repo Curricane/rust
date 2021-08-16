@@ -44,7 +44,7 @@
     - [2.8.4. Key-Value映射表：HashMap和BTreeMap](#284-key-value映射表hashmap和btreemap)
     - [2.8.5. 集合：HashSet和BTreeSet](#285-集合hashset和btreeset)
     - [2.8.6. 优先队列：BinaryHeap](#286-优先队列binaryheap)
-  - [智能指针](#智能指针)
+  - [2.9. 智能指针](#29-智能指针)
 # 1. 新时代的语言
 # 2. 语言精要
 ## 2.1. Rust 语言的基本构成
@@ -657,10 +657,22 @@ HashSet＜K＞和BTreeSet＜K＞其实就是HashMap＜K，V＞和BTreeMap＜K，
 ### 2.8.6. 优先队列：BinaryHeap
 Rust提供的优先队列是基于二叉最大堆（Binary Heap）实现的
 
-## 智能指针
+## 2.9. 智能指针
 - Rust 中的值默认被分配到栈内存
 - 可以通过 Box ＜T＞将值装箱（在堆内存中分配）；
   - Box＜T＞是指向类型为T的堆内存分配值的智能指针
   - 当Box＜T＞超出作用域范围时，将调用其析构函数，销毁内部对象，并自动释放堆中的内存
   - 可以通过解引用操作符来获取Box＜T＞中的T
   - Box＜T＞的行为像引用，并且可以自动释放内存，所以我们称其为智能指针
+```rust
+fn main() {
+    #[derive(PartialEq, Debug)]
+    struct Point {
+        x: f64,
+        y: f64,
+    }
+    let box_point = Box::new(Point {x: 0.0, y: 0.0});
+    let unboxed_point: Point = *box_point;
+    assert_eq!(unboxed_point, Point {x: 0.0, y: 0.0});
+}
+```
