@@ -33,6 +33,11 @@
     - [2.6.7. str 字符串类型](#267-str-字符串类型)
     - [2.6.8. 原生指针](#268-原生指针)
     - [2.6.9. never 类型](#269-never-类型)
+  - [2.7. 复合数据类型](#27-复合数据类型)
+    - [2.7.1. 元组](#271-元组)
+    - [2.7.2. 结构体](#272-结构体)
+    - [枚举体](#枚举体)
+  - [常用集合类型](#常用集合类型)
 # 1. 新时代的语言
 # 2. 语言精要
 ## 2.1. Rust 语言的基本构成
@@ -444,3 +449,98 @@ fn main() {
 - Rust中提供了一种特殊数据类型，never类型，即!
   - 该类型用于表示永远不可能有返回值的计算类型
 - never类型是可以强制转换为其他任何类型的。
+
+## 2.7. 复合数据类型
+- 元组（Tuple）
+- 结构体（Struct）
+- 枚举体（Enum）
+- 联合体（Union）
+
+### 2.7.1. 元组
+- 元组用一对 `( )` 包括的一组数据，**可以包含不同种类的数据**
+```rust
+fn move_coords( x: (i32, i32) ) -> (i32, i32) {
+    (x.0 + 1, x.1 + 1)
+}
+
+fn main() {
+    let tuple: (&'static str, i32, char) = ("hello", 5, 'c');
+    assert_eq!(tuple.0, "hello");
+    let coords = (0, 1);
+    let result = move_coords(coords);
+    assert_eq!(result, (1, 2));
+    let (x, y) = move_coords(coords); // let支持模式匹配，可以用来解构元组
+    assert_eq!(x, 1);
+    assert_eq!(y, 2);
+}
+```
+- 可以通过索引来获取元组内元素的值
+- 因为let支持模式匹配，所以可以用来解构元组
+- 利用元组也可以让函数返回多个值
+- 当元组中只有一个值的时候，需要加逗号，即 （0，），这是为了和括号中的其他值进行区分
+- `()` 空元组
+
+### 2.7.2. 结构体
+- Rust 提供三种结构体
+  - 具名结构体
+  - 元组结构体
+    - 特点是，字段没有名称，只有类型 `struct Color(i32, i32, i32`
+    - 当一个元组结构体只有一个字段的时候，我们称之为`New Type模式`，`struct Integer(u32)`
+  - 单元结构体 
+    - 没有任何字段的结构体 `struct Empty`
+    - 单元结构体实例就是其本身
+      - 在 Release 编译模式下，单元结构体实例会被优化为同一个对象；而在 Debug模式下，则不会进行这样的优化
+-  构体名称要遵从驼峰式命名规则。虽然不按驼峰式命名也可以通过编译，但是编译器会警告你
+-  结构体上方的＃[derive（Debug，PartialEq）]是属性，可以让结构体自动实现Debug trait和PartialEq trait，它们的功能是允许对结构体实例进行打印和比较
+-  在impl块中定义的函数被称为方法，这和面向对象有点渊源
+
+### 枚举体
+- 枚举体（Enum，也可称为枚举类型或枚举），顾名思义，该类型包含了全部可能的情况，可以有效地防止用户提供无效值
+- 三类
+  - 无参数枚举体
+  - 类C枚举体
+  - 携带类型参数的枚举体
+    - 这样的枚举值本质上属于函数指针类型
+```rust
+// 无参数枚举
+enum Number {
+    Zero,
+    One,
+    Two,
+}
+fn test1 () {
+    let a = Number::One;
+    match a {
+        Number::Zero => println!("0"),
+        Number::One => println!("1"),
+        Number::Two => println!("2"),
+    }
+}
+
+// 类C枚举类型
+enum Color {
+    Red = 0xff0000,
+    Green = 0x00ff00,
+    Blue = 0x0000ff,
+}
+fn test2 () {
+    println!("roses are #{:06x}", Color::Red as i32);
+}
+
+// 带参数枚举体
+enum IpAddr {
+    V4(u8, u8, u8, u8),
+    V6(String),
+}
+
+fn test3 () {
+    let x : fn(u8, u8, u8, u8) -> IpAddr = IpAddr::V4;
+    let home = IpAddr::V4(127, 0, 0, 1);
+}
+```
+## 常用集合类型
+- 在Rust标准库std::collections模块下有4种通用集合类型
+  - 线性序列：向量（Vec）、双端队列（VecDeque）、链表（LinkedList）
+  - Key-Value映射表：无序哈希表（HashMap）、有序哈希表（BTreeMap）
+  - 集合类型：无序集合（HashSet）、有序集合（BTreeSet）
+  - 优先队列：二叉堆（BinaryHeap）
