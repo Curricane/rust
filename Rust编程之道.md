@@ -45,6 +45,9 @@
     - [2.8.5. 集合：HashSet和BTreeSet](#285-集合hashset和btreeset)
     - [2.8.6. 优先队列：BinaryHeap](#286-优先队列binaryheap)
   - [2.9. 智能指针](#29-智能指针)
+  - [2.10. 泛型和 trait](#210-泛型和-trait)
+    - [2.10.1. 泛型](#2101-泛型)
+    - [2.10.2. trait](#2102-trait)
 # 1. 新时代的语言
 # 2. 语言精要
 ## 2.1. Rust 语言的基本构成
@@ -676,3 +679,53 @@ fn main() {
     assert_eq!(unboxed_point, Point {x: 0.0, y: 0.0});
 }
 ```
+## 2.10. 泛型和 trait
+- 泛型允许开发者编写一些在使用时才指定类型的代码
+- trait是Rust实现零成本抽象的基石
+  - trait是Rust唯一的接口抽象方式
+  - 可以静态生成，也可以动态调用
+  - 可以当作标记类型拥有某些特定行为的“标签”来使用
+  - trait是对类型行为的抽象
+
+### 2.10.1. 泛型
+- 只有实现了Debug trait的类型才拥有使用＂{：？}＂格式化打印的行为
+
+### 2.10.2. trait
+```rust
+struct Duck;
+struct Pig;
+
+trait Fly { // 定义 triat
+    fn fly(&self) -> bool;
+}
+impl Fly for Duck { // 为类型实现一个 trait
+    fn fly(&self) -> bool {
+        return true;
+    }
+}
+impl Fly for Pig {
+    fn fly(&self) -> bool {
+        return false;
+    }
+}
+fn fly_static<T: Fly> (s: &T) -> bool { // 静态分发
+    s.fly()
+}
+fn fly_dyn (s: &dyn Fly) -> bool { // 动态分发
+    s.fly()
+}
+fn main() {
+   let pig = Pig;
+   assert_eq!(fly_static::<Pig>(&pig), false);
+   assert_eq!(fly_dyn(&pig), false);
+   let duck = Duck;
+   assert_eq!(fly_static::<Duck>(&duck), true);
+   assert_eq!(fly_dyn(&duck), true); 
+}
+```
+- trait中也可以定义函数的默认实现
+- 使用＃[derive（Debug）]属性帮助开发者自动实现Debug trait
+- 静态分发
+  - 在编译阶段，泛型已经被展开为具体类型的代码
+- 动态分发
+  - 在运行时查找相应类型的方法，会带来一定的运行时开销，不过这种开销很小
