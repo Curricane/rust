@@ -58,7 +58,24 @@
     - [3.1.3. 类型系统与多态性](#313-类型系统与多态性)
   - [3.2. Rust类型系统概述](#32-rust类型系统概述)
     - [3.2.1. 类型大小](#321-类型大小)
+      - [3.2.1.1. 零大小类型](#3211-零大小类型)
+      - [3.2.1.2. 底类型](#3212-底类型)
     - [3.2.2. 类型推导](#322-类型推导)
+  - [3.3. 泛型](#33-泛型)
+    - [3.3.1. 泛型返回值自动推导](#331-泛型返回值自动推导)
+  - [3.4. 深入triat](#34-深入triat)
+    - [3.4.1. 接口抽象](#341-接口抽象)
+      - [3.4.1.1. 关联类型 type](#3411-关联类型-type)
+      - [3.4.1.2. trait一致性](#3412-trait一致性)
+      - [3.4.1.3. trait继承](#3413-trait继承)
+    - [3.4.2. 泛型约束](#342-泛型约束)
+    - [3.4.3. 类型抽象](#343-类型抽象)
+      - [3.4.3.1. trait object ？](#3431-trait-object-)
+      - [3.4.3.2. impl Trait](#3432-impl-trait)
+    - [3.4.4. 标签trait](#344-标签trait)
+      - [3.4.4.1. Sized trait](#3441-sized-trait)
+      - [3.4.4.2. Copy trait](#3442-copy-trait)
+      - [3.4.4.3. Send trait 和 Sync trait](#3443-send-trait-和-sync-trait)
 # 1. 新时代的语言
 # 2. 语言精要
 ## 2.1. Rust 语言的基本构成
@@ -824,7 +841,7 @@ Rust文档的哲学是：代码即文档，文档即代码
 - Rust也有少量的动态大小的类型（Dynamic Sized Type，DST），比如str类型的字符串字面量，编译器不可能事先知道程序中会出现什么样的字符串，所以对于编译器来说，str类型的大小是无法确定的。
   - 对于这种情况，Rust提供了引用类型，因为引用总会有固定的且在编译期已知的大小。字符串切片&str就是一种引用类型，它由指针和长度信息组成，&str存储于栈上，str字符串序列存储于堆上
     - 这种包含了动态大小类型地址信息和携带了长度信息的指针，叫作胖指针（Fat Pointer），所以&str是一种胖指针
-- 零大小类型
+#### 3.2.1.1. 零大小类型
   - 单元类型
   - 单元结构体
   - 单元类型和单元结构体大小为零，由单元类型组成的数组大小也为零。ZST类型的特点是，它们的值就是其本身，运行时并不占用内存空间。ZST类型代表的意义正是“空”。
@@ -856,7 +873,7 @@ Rust文档的哲学是：代码即文档，文档即代码
     }
   }
   ```
-- 底类型
+#### 3.2.1.2. 底类型
   - 其实是never类型
   - 没有值
   - 是其他任意类型的子类型
@@ -884,3 +901,309 @@ Rust文档的哲学是：代码即文档，文档即代码
   }
   ```
 - 用Rust编程的时候，应尽量显式声明类型，这样可以避免一些麻烦
+
+## 3.3. 泛型
+- 泛型（Generic）是一种参数化多态。使用泛型可以编写更为抽象的代码，减少工作量
+- 结构体、函数名称旁边的＜T＞叫作泛型声明。泛型只有被声明之后才可以被使用
+- 泛型函数
+  ```rust
+  fn foo<T>(x: T) -> T {
+    return x;
+  }
+  ```
+- 泛型结构体
+  ```rust
+  struct Point<T> {x: T, y: T}
+  ```
+  - 泛型方法
+  ```rust
+  impl<T> Point<T> {
+    fn new(x: T, y: T) -> Self {
+      Point{x: x, y: y}
+    }
+  }
+  ```
+- Rust中的泛型属于静多态，它是一种编译期多态
+  - 在编译期，不管是泛型枚举，还是泛型函数和泛型结构体，都会被单态化（Monomorphization），意味着编译器要将一个泛型函数生成两个具体类型对应的函数
+    - 单态化静态分发的好处是性能好，没有运行时开销；
+    - 缺点是容易造成编译后生成的二进制文件膨胀
+
+### 3.3.1. 泛型返回值自动推导
+- 变量申明了类型，可以让泛型不标注类型
+
+## 3.4. 深入triat
+- 接口抽象。接口是对类型行为的统一约束
+- 泛型约束。泛型的行为被trait限定在更有限的范围内
+- 抽象类型。在运行时作为一种间接的抽象类型去使用，动态地分发给具体的类型
+- 标签trait。对类型的约束，可以直接作为一种“标签”使用
+
+### 3.4.1. 接口抽象
+- 接口中可以定义方法，并支持默认实现
+- 接口中不能实现另一个接口，但是接口之间可以继承
+- 同一个接口可以同时被多个类型实现，但不能被同一个类型实现多次
+- 使用impl关键字为类型实现接口方法
+- 使用trait关键字来定义接口
+#### 3.4.1.1. 关联类型 type
+  ```rust
+  pub trait Add<RHS = Self> { // 类型参数RHS指定了默认值Self
+    type Output; // 关联类型
+    fn add(self, rhs: RHS) -> Self::Output;
+  }
+  ```
+  - `Self`是每个trait都带有的**隐式类型参数**，**代表实现当前trait的具体类型**
+  - 使用关联类型能够使代码变得更加精简，同时也对方法的输入和输出进行了很好的隔离，使得代码的可读性大大增强。
+  - 在语义层面上，使用关联类型也增强了trait表示行为的这种语义，因为它表示了和某个行为（trait）相关联的类型。在工程上，也体现出了**高内聚**的特点。
+  - 实现的时候 关联类型Output必须指定具体类型
+#### 3.4.1.2. trait一致性
+  - 孤儿规则（Orphan Rule）
+    - 如果要实现某个trait，那么该trait和要实现该trait的那个类型至少有一个要在当前crate中定义，防止被破坏性地改写
+#### 3.4.1.3. trait继承
+  - Rust不支持传统面向对象的继承，但是支持trait继承
+### 3.4.2. 泛型约束
+- trait限定(trait Bound)
+  - 类型可以看作具有相同属性值的集合
+- Rust提供了where关键字，用来对复杂约束情况进行重构
+
+### 3.4.3. 类型抽象
+trait还可以用作抽象类型（Abstract Type）。抽象类型属于类型系统的一种，也叫作存在类型（Existential Type）。相对于具体类型而言，抽象类型无法直接实例化，它的每个实例都是具体类型的实例。
+-  Rust目前有两种方法来处理抽象类型：trait对象和impl Trait
+#### 3.4.3.1. trait object ？
+将共同拥有相同行为的类型集合抽象为一个类型，这就是trait对象（traitObject）
+```rust
+#[derive(Debug)]
+struct Foo;
+trait Bar {
+    fn baz(&self);
+}
+impl Bar for Foo {
+    fn baz(&self) {println!("{:?}", self)}
+}
+/// 带trait限定的泛型函数，静态分发
+fn static_dispatch<T>(t: &T) where T:Bar {
+    t.baz();
+}
+
+/// 使用trait对象，动态分发
+fn dynamic_dispatch(t: &dyn Bar) { // trait本身也是一种类型，但它的类型大小在编译期是无法确定的，所以trait对象必须使用指针
+    t.baz(); 
+}
+fn main() {
+   let foo = Foo;
+   static_dispatch(&foo);
+   dynamic_dispatch(&foo);
+}
+```
+- trait 对象的实现
+  ```rust
+  // 等价于trait对象的结构体
+  // TraitObject来自Rust标准库，但它并不能代表真正的trait对象，它仅仅用于操作底层的一些 Unsafe 代码，此处用于理解
+  pub struct TraitObject {
+    pub data: *mut (),
+    pub vtable: *mut (),
+  }
+  ```
+  ![TraitObject结构示意](./grammer/picture/TraitObject结构示意.png)
+  - `TraitObject`包括两个指针：data指针和vtable指针
+- 并不是每个 trait 都可以作为 trait 对象被使用，这依旧和类型大小是否确定有关系。
+  - 每个 `trait` 都包含一个隐式的类型参数`Self`，代表实现该`trait`的类型。`Self`默认有一个隐式的`trait`限定`?Sized`，形如`<Self: ?Sized>`，`?Sized trait` 包括了所有的动态大小类型和所有可确定大小的类型
+  - **当`trait object`在运行期进行动态分发时，也必须确定大小，否则无法为其正确分配内存空间**。所以**必须同时满足**以下两条规则的trait才可以作为trait对象使用。
+    - `trait`的`Self类型参数`不能被限定为`Sized`
+      - `trait`的`Self类型参数`绝大部分情况默认是`?Sized`，但也有可能出现被限定为`Sized`的情况
+        ```rust
+        trait Foo: Sized {
+          fn some_method(&self);
+        }
+        ```
+        - Foo继承自Sized，这表明，要为某类型实现Foo，必须先实现Sized。所以，Foo中的隐式Self也必然是Sized的，因为Self代表的是那些要实现Foo的类型
+        - trait对象本身是动态分发的，编译期根本无法确定Self具体是哪个类型，因为不知道给哪些类型实现过该trait，更无法确定其大小，现在又要求Self是可确定大小的，这就造就了薛定谔的类型：既能确定大小又不确定大小
+        - **反过来，当不希望trait作为trait对象时，可以使用Self：Sized进行限定**
+    - `trait`中所有的方法都必须是**对象安全**的
+      - 对象安全的方法必须满足以下三点之一
+        - 方法受`Self：Sized`约束
+        - **没有额外Self类型参数的非泛型成员方法**，分解为以下三点： 
+          - 必须不包含任何泛型参数。如果包含泛型，trait对象在虚表（Vtable）中查找方法时将不确定该调用哪个方法
+          - 第一个参数必须为 Self 类型或可以解引用为 Self 的类型（也就是说，必须有接收者，比如self、&self、&mut self和self：Box＜Self＞，没有接收者的方法对trait对象来说毫无意义）
+          - Self不能出现在除第一个参数之外的地方，包括返回值中。这是因为如果出现Self，那就意味着Self和self、&self或&mut self的类型相匹配。但是对于trait对象来说，根本无法做到保证类型匹配，因此，这种情况下的方法是对象不安全的
+        - trait中不能包含关联常量（Associated Constant）
+      - 标准的对象安全的trait
+      ```rust
+      trait Bar {
+        fn bax(self, x: u32);
+        fn bay(&self);
+        fn baz(&mut self);
+      }
+      ``` 
+#### 3.4.3.2. impl Trait
+- 如果说trait对象是装箱抽象类型（Boxed Abstract Type）的话，那么impl Trait就是拆箱抽象类型（Unboxed Abstract Type）
+- 其中“装箱”代表将值托管到堆内存，而“拆箱”则是在栈内存中生成新的值
+- 目前impl Trait只可以在输入的参数和返回值这两个位置使用
+  ```rust
+  use std::fmt::Debug;
+  pub trait Fly {
+      fn fly(&self) -> bool;
+  }
+  #[derive(Debug)]
+  struct Duck;
+  #[derive(Debug)]
+  struct Pig;
+
+  impl Fly for Duck {
+      fn fly(&self) -> bool {
+          return true;
+      }
+  }
+  impl Fly for Pig {
+      fn fly(&self) -> bool {
+          return false;
+      }
+  }
+
+  fn fly_statict(s: impl Fly + Debug) -> bool {
+      s.fly()
+  }
+
+  // impl trait 做参数 和 返回值
+  fn can_fly(s: impl Fly + Debug) -> impl Fly {
+      if s.fly() {
+          println!("{:?} can fly", s);
+      } else {
+          println!("{:?} can't fly", s);
+      }
+      s
+  }
+  fn main() {
+      let pig = Pig;
+      assert_eq!(fly_statict(pig), false);
+      let duck = Duck;
+      assert_eq!(fly_statict(duck), true);
+      let pig = Pig;
+      let _ = can_fly(pig);
+      let duck = Duck;
+      let _ = can_fly(duck);
+  }
+  ```
+- impl Trait只能用于为单个参数指定抽象类型，如果对多个参数使用impl Trait语法，编译器将报错
+- 参数中`impl trait + ‘static`中，`'static`是一种生命周期参数，它限定该`impl trait`参数不能是引用类型
+  ```rust
+  fn dyn_can_fly(s: impl Fly + Debug + 'static) -> Box<dyn Fly> {
+      if s.fly() {
+          println!("{:?} can fly", s);
+      } else {
+          println!("{:?} can't fly", s);
+      }
+      Box::new(s)
+  }
+  ```
+### 3.4.4. 标签trait
+- trait 这种对行为约束的特性也非常适合作为类型的标签。
+- Rust一共提供了5个重要的**标签trait**，都被定义在标准库`std::marker`模块中:
+  - Sized trait，用来标识编译期可确定大小的类型
+  - Unsize trait，目前该trait为实验特性，用于标识动态大小类型（DST）
+  - Copy trait，用来标识可以按位复制其值的类型
+  - Send trait，用来标识可以跨线程安全通信的类型
+  - Sync trait，用来标识可以在线程间安全共享引用的类型
+
+#### 3.4.4.1. Sized trait
+- Sized trait 非常重要，编译器用它来识别可以在编译期确定大小的类型
+- 内部实现
+  ```rust 
+  #[lang = "sized"] // 这里真正起“打标签”作用
+  pub trait Sized {
+    // 代码为空，无具体实现方式
+  }
+  ```
+  - Sized trait是一个空trait，因为仅仅作为标签trait供编译器使用;
+  - 属性＃[lang=＂sized＂],该属性`lang`表示`Sized trait`供 Rust 语言本身使用，声明为`sized`，称为语言项（Lang Item）
+- Rust语言中大部分类型都是默认Sized的，所以在写泛型结构体的时候，没有显式地加上Sized trait限定
+  ```rust
+  struct Foo<T>(T); // Foo是一个泛型结构体，等价于Foo＜T：Sized＞
+  struct Bar<T: ?Sized>(T); // 如果需要在结构体中使用动态大小类型，则需要改为＜T：？Sized＞限定
+  ```
+- `Sized`、`Unsize`和`？Sized`的关系
+  ![Sized_Unsize_?Sized的关系](grammer/picture/Sized_Unsize_?Sized的关系.png)
+- Sized标识的是在编译期可确定大小的类型，而Unsize标识的是动态大小类型，在编译期无法确定其大小
+- 目前Rust中的动态类型有trait和`[T]`，其中`[T]`代表一定数量的T在内存中依次排列，但不知道具体的数量，所以它的大小是未知的，用Unsize来标记。比如str字符串和`定长数组[T；N]`。`[T]`其实是`[T；N]`的特例，当N的大小未知时就是`[T]`
+- `<T: ?Sized>`支持编译期可确定大小类型和动态大小类型两种类型
+- **动态大小类型不能随意使用，还需要遵循如下三条限制规则**
+  - 只可以通过胖指针来操作Unsize类型，比如&[T]或&Trait
+  - 变量、参数和枚举变量不能使用动态大小类型
+  - 结构体中只有最后一个字段可以使用动态大小类型，其他字段不可以使用
+
+#### 3.4.4.2. Copy trait
+- Copy trait用来标记可以**按位复制**其值的类型，按位复制等价于C语言中的`memcpy`
+- Copy trait内部实现
+  ```rust
+  #[lang = "copy"]
+  pub trait Copy : Clone {
+    // 代码为空，无具体实现
+  }
+  ```
+  - Copy trait继承自Clone trait，意味着，要实现Copy trait的类型，必须实现Clone trait中定义的方法
+  ```rust
+  // std::clone 模块中 Clone trait 内部实现
+  pub trait Clone : Sized {
+    fn clone(&self) -> Self;
+    fn clone_from(&mut self, source: &Self) {
+      *self = source.clone()
+    }
+  }
+  ``` 
+  - 如果想让一个类型实现Copy trait，就必须同时实现Clone trait
+    ```rust
+    struct MyStruct;
+    impl Copy for MyStruct{}
+    impl Clone for MyStruct {
+      fn clone(&self) -> MyStruct {
+        *self
+      }
+    }
+    ``` 
+  - 如果每次都这样实现一遍，会比较麻烦。所以Rust提供了更方便的derive属性供我们完成这项重复的工作
+    ```rust
+    #[derive(Copy, Clone)]
+    struct MyStruct;
+    ```
+- Copy是一个标签trait，编译器做类型检查时会检测类型所带的标签，以验证它是否“合格”
+- **Copy的行为是一个隐式的行为**，开发者不能重载Copy行为，它永远都是一个简单的位复制
+  - Copy隐式行为发生在执行变量绑定、函数参数传递、函数返回等场景中，因为这些场景是开发者无法控制的，所以需要编译器来保证
+- **Clone trait是一个显式的行为**，任何类型都可以实现Clone trait，开发者可以自由地按需实现Copy行为。比如，String类型并没有实现Copy trait，但是它实现了Clone trait，如果代码里有需要，只需要调用String 类型的clone 方法即可
+  - 但需要记住一点，如果一个类型是Copy的，它的clone方法仅仅需要返回*self即可
+- **并非所有类型都可以实现Copy trait**
+  - 如果是数组类型，且其内部元素都是Copy类型，则数组**本身**就是Copy类型
+  - 如果是元组类型，且其内部元素都是Copy类型，则该元组会**自动实现**Copy
+  - 如果是结构体或枚举类型，只有当每个内部成员都实现Copy时，它才**可以实现**Copy，并不会像元组那样自动实现Copy
+  - Rust为很多基本数据类型实现了Copy trait
+    - 数字类型、字符（Char）、布尔类型、单元值、不可变引用
+
+#### 3.4.4.3. Send trait 和 Sync trait
+- Rust对并发的支持和其他语言有所不同。Rust在标准库中提供了很多并发相关的**基础设施**，比如线程、Channel、锁和Arc等，这些都是**独立于语言核心之外的库**，意味着基于Rust的并发方案不受标准库和语言的限制，开发人员可以编写自己所需的并发模型
+- 多线程编程之所以有这么严重的问题，是因为系统级的线程是不可控的，编写好的代码不一定会按期望的顺序执行，会带来**竞态条件（Race Condition）**
+- 不同的线程同时访问一块共享变量也会造成**数据竞争（Data Race）**。**竞态条件**是不可能被消除的，**数据竞争**是有可能被消除的，而**数据竞争**是线程安全最大的“隐患”
+- Rust提供了Send和Sync两个标签trait，它们是Rust无数据竞争并发的基石。
+  - 实现了Send的类型，可以跨线程安全地传递值，也就是说可以跨线程传递所有权，一传一
+  - 实现了Sync的类型，可以跨线程安全地传递共享（不可变）引用，一传多
+- 有了这两个标签trait，就可以把Rust中所有的类型归为两类
+  - 可以安全跨线程传递的值和引用
+  - 不可以跨线程传递的值和引用
+- 再配合所有权机制，带来的效果就是，Rust能够在编译期就检查出数据竞争的隐患，而不需要等到运行时再排查
+- Send 和 Sync 的内部实现
+  ```rust
+  #[lang = "send"]
+  pub unsafe trait Send {
+    // 代码为空，无具体实现
+  }
+
+  #[lang = "sync"]
+  pub unsafe trait Sync {
+    // 代码为空，无具体实现
+  }
+  ```
+- Rust 为所有的类型实现了 Send 和 Sync
+  ```rust
+  unsafe impl Send for .. {}
+  impl<T: ?Sized> !Send for *const T {}
+  impl<T: ?Sized> !Send for *mut T {}
+  ```
+  - 第1行使用了特殊的语法`for..`，表示为所有类型实现Send，Sync也同理。
+  - 同时，第2行和第3行也对两个原生指针实现了 `!Send`，代表它们不是线程安全的类型，将它们排除出去
+- 对于自定义的数据类型，如果其成员类型全部实现Send和Sync，此类型才会被**自动实现**Send和Sync。Rust也提供了类似Copy和Clone那样的derive属性来自动导入Send和 Sync 的实现，但并不建议开发者使用该属性，因为它可能引起编译器检查不到的线程安全问题

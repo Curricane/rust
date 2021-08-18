@@ -57,10 +57,10 @@
         - [1.15.2. 结构体中使用字符串切片引用](#1152-结构体中使用字符串切片引用)
         - [1.15.3. 需要生命周期的地方](#1153-需要生命周期的地方)
         - [1.15.4. 静态生命周期](#1154-静态生命周期)
-- [使用 rust 遇到的问题](#使用-rust-遇到的问题)
-    - [git 拉取第三方库失败](#git-拉取第三方库失败)
-    - [Blocking waiting for file lock on package cache](#blocking-waiting-for-file-lock-on-package-cache)
-    - [Blocking waiting for file lock on build directory](#blocking-waiting-for-file-lock-on-build-directory)
+- [2. 使用 rust 遇到的问题](#2-使用-rust-遇到的问题)
+    - [2.1. git 拉取第三方库失败](#21-git-拉取第三方库失败)
+    - [2.2. Blocking waiting for file lock on package cache](#22-blocking-waiting-for-file-lock-on-package-cache)
+    - [2.3. Blocking waiting for file lock on build directory](#23-blocking-waiting-for-file-lock-on-build-directory)
 # 1. 简介
 用于 rust 语法的学习
 ## 1.1. 初识 rust
@@ -971,14 +971,14 @@ impl<'a> Str<'a> {
 - 所有用双引号包括的字符串常量所代表的精确数据类型都是 &'static str 
 - `'static` 所表示的生命周期从程序运行开始到程序运行结束。
 
-# 使用 rust 遇到的问题
-## git 拉取第三方库失败
+# 2. 使用 rust 遇到的问题
+## 2.1. git 拉取第三方库失败
 - `vim ~/.cargo/config.toml`
 ```
 [net]
 git-fetch-with-cli = true
 ```
-## Blocking waiting for file lock on package cache
+## 2.2. Blocking waiting for file lock on package cache
 - `rm ~/.cargo/.package-cache`
-## Blocking waiting for file lock on build directory
+## 2.3. Blocking waiting for file lock on build directory
 - `cargo clean`
