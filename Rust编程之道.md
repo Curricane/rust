@@ -76,6 +76,14 @@
       - [3.4.4.1. Sized trait](#3441-sized-trait)
       - [3.4.4.2. Copy trait](#3442-copy-trait)
       - [3.4.4.3. Send trait 和 Sync trait](#3443-send-trait-和-sync-trait)
+  - [3.5. 类型转换](#35-类型转换)
+    - [3.5.1. Deref 解引用](#351-deref-解引用)
+      - [3.5.1.1. 自动解引用](#3511-自动解引用)
+      - [3.5.1.2. 手动解引用](#3512-手动解引用)
+    - [3.5.2. as 操作符](#352-as-操作符)
+      - [3.5.2.1. 无歧义限定语法](#3521-无歧义限定语法)
+      - [3.5.2.2. 类型和子类型相互转换](#3522-类型和子类型相互转换)
+    - [3.5.3. From 和 Into](#353-from-和-into)
 # 1. 新时代的语言
 # 2. 语言精要
 ## 2.1. Rust 语言的基本构成
@@ -1207,3 +1215,152 @@ fn main() {
   - 第1行使用了特殊的语法`for..`，表示为所有类型实现Send，Sync也同理。
   - 同时，第2行和第3行也对两个原生指针实现了 `!Send`，代表它们不是线程安全的类型，将它们排除出去
 - 对于自定义的数据类型，如果其成员类型全部实现Send和Sync，此类型才会被**自动实现**Send和Sync。Rust也提供了类似Copy和Clone那样的derive属性来自动导入Send和 Sync 的实现，但并不建议开发者使用该属性，因为它可能引起编译器检查不到的线程安全问题
+
+## 3.5. 类型转换
+- 隐式类型转换（Implicit Type Conversion）
+  - 隐式类型转换是由编译器或解释器来完成的，开发者并未参与，所以又称之为强制类型转换（Type Coercion）
+  - Rust中的隐式类型转换基本上只有自动解引用
+- 显式类型转换（ExplicitType Conversion）
+  - 由开发者指定的，就是一般意义上的类型转换（Type Cast）
+- Rust语言，只要不乱用unsafe块来跳过编译器检查，就不会因为类型转换出现安全问题
+
+### 3.5.1. Deref 解引用
+#### 3.5.1.1. 自动解引用
+自动解引用虽然是编译器来做的，但是自动解引用的行为可以由开发者来定义
+- 一般来说，引用使用`&`操作符，而解引用使用`*`操作符
+- 可以通过实现`Deref trait`来自定义解引用操作
+  - 如果一个类型 T 实现了`Deref<Target=U>`，`则该类型 T 的引用（或智能指针）**在应用的时候**会被自动转换为类型 U
+  ```rust
+  // Deref trait内部实现
+  pub trait Deref {
+    type Target: ?Sized;
+    fn deref(&self) -> &Self::Target;
+  }
+
+  pub trait DerefMut: Deref {
+    fn deref_mut(&mut self) -> &mut Self::Target;
+  }
+  ```
+  - String类型实现了Deref
+    ```rust
+    fn main() {
+      let a = "hello".to_string();
+      let b = " world".to_string(); // str -> String
+      let c = a + &b; // String类型实现的add方法的右值参数必须是 &str 类型，这里 &String -> &str
+      println!("{:?}", c); // "hello world"
+    }
+    ```
+  - `Vec<T>`实现了`Deref<Target=[T]>`，所以`&Vec<T>`会被自动转换为`&[T]类型`
+  - `Rc<T>`实现了`Deref<Target<T>>`，所以`&RC<T>`会被自动转化为`&T 类型`
+  ```rust
+  use std::rc::Rc;
+  fn foo(s: &[i32]) {
+      println!("{:?}", s[0]);
+  }
+  fn main() {
+      let v = vec![1, 2, 3];
+      foo(&v); // &v 自动解引用为 &[]
+
+      let x = Rc::new("Hello");
+      println!("{:?}", x.chars()); // &x 自动解引用为 &str, println! 会自动的给参数加引用& 
+  }
+  ``` 
+#### 3.5.1.2. 手动解引用
+- 但在有些情况下，就算实现了 Deref，编译器也不会自动解引用
+  - 如果`x.fna()`, `引用x`没有实现方法`fna`，会尝试进行自动解引用后 `Deref x -> &T`，调用`&T.fna()`
+  - 如果`x.fna()`, `引用x`有实现方法`fna`，则直接调用`x.fna()`，不会进行自动解引用
+    ```rust
+    use std::rc::Rc;
+    fn main() {
+
+        let x = Rc::new("Hello");
+        println!("{:?}", x.chars()); // x 是智能指针，Rc 并没有 chars 方法，尝试自动解引用，为 &str,
+
+        let x = Rc::new("hello");
+        let y = x.clone(); // Rc 有 clone 方法，直接调用 Rc.Clone 得到 Rc<&str>
+        let z = (*x).clone(); // （*x) 手动解引用，&str 类型，调用 &str 的 clone 方法，得到 &str
+    }
+    ```
+  - match 引用时需要手动解引用
+    ```rust
+    fn main() {
+      let x = "hello".to_string();
+      match &x { // 只能通过手动解引用把&String类型转换成&str类型
+        "hello" => {println!("hello")},
+        _ => {}
+      }
+    }
+    ```
+    - `match x.deref()`, 直接调用deref方法，需要`use std::ops::Deref`
+    - `match x.as_ref()`, `String`类型提供了`as_ref`方法类返回一个`&str`，该方法定于于`AsRef trait`中
+    - `match x.borrow()`,该方法定于于`Borrow trait`中，行为和`AsRef`一样，需要`use std::borrow::Borrow`
+    - `match &*x`
+    - `match &x[..]` 这是因为String类型的index操作可以返回&str类型
+
+### 3.5.2. as 操作符
+- as 操作符最常用的场景就是转换 Rust 中的基本数据类型。需要注意的是，as 关键字不支持重载
+  - `let b = a as u64`
+  - 需要注意的是，短（大小）类型转换为长（大小）类型的时候是没有问题的，但是如果反过来，则会被截断处理
+  - 当从**有符号类型**向**无符号类型**转换的时候，最好使用标准库中提供的专门的方法，而不要直接使用as操作符
+
+#### 3.5.2.1. 无歧义限定语法
+- 为结构体实现多个trait时，可能会出现同名的方法，此时使用as操作符可以帮助避免歧义
+```rust
+struct S(i32);
+trait A {
+    fn test(&self, i: i32);
+}
+trait B {
+    fn test(&self, i: i32);
+}
+impl A for S {
+    fn test(&self, i: i32) {
+        println!("From A: {:?}", i);
+    }
+}
+impl B for S {
+    fn test(&self, i: i32) {
+        println!("From B: {:?}", i);
+    }
+}
+fn main() {
+    let s = S(1);
+    // 对trait行为的转换
+    
+    // 遗漏了S结构体这一信息，可读性相对差一些
+    A::test(&s, 1);
+    B::test(&s, 1);
+
+    // 无歧义完全限定语法 or 通用函数调用语法
+    <S as A>::test(&s, 1);
+    <S as B>::test(&s, 1);
+}
+```
+#### 3.5.2.2. 类型和子类型相互转换
+- as转换还可以用于类型和子类型之间的转换。
+- Rust中没有标准定义中的子类型, 但是生命周期标记可看作子类型
+  - 比如&＇static str类型是&＇a str类型的子类型
+  - 通过as操作符转换可以将&＇static str类型转为&＇a str类型
+    ```rust
+    fn main() {
+        let a: &'static str = "hello"; // &'static str
+        let b: &str = a as &str; //&str
+        let c: &'static str = b as &'static str; // &'static str
+    }
+    ```
+### 3.5.3. From 和 Into
+From和Into是定义于`std::convert`模块中的两个trait。它们定义了from和into两个方法，这两个方法互为反操作
+```rust
+pub trait From<T> {
+  fn from(T) -> Self;
+}
+pub trait Into<T> {
+  fn into(self) -> T;
+}
+```
+- 对于类型T，如果它实现了From＜U＞，则可以通过T::from（u）来生成T类型的实例，此处u为U的类型实例
+- 对于类型T，如果它实现了Into＜U＞，则可以通过into方法来消耗自身转换为类型U的新实例
+  - 关于Into有一条默认的规则：如果类型U实现了From＜T＞，则T类型实例调用into方法就可以转换为类型U。这是因为Rust标准库内部有一个默认的实现
+    - `impl <T, U> Into<U> for T where U: From<T>`
+      - 一般情况下，只需要实现From即可，除非From不容易实现，才需要考虑实现Into
+  - 在标准库中，还包含了TryFrom和TryInto两种trait，是From和Into的错误处理版本，因为类型转换是有可能发生错误的，所以在需要进行错误处理的时候可以使用 TryFrom 和TryInto
