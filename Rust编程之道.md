@@ -133,6 +133,15 @@
     - [5.5.2. 省略生命周期参数](#552-省略生命周期参数)
     - [5.5.3. 生命周期限定](#553-生命周期限定)
     - [5.5.4. trait object 的生命周期](#554-trait-object-的生命周期)
+  - [5.6. 智能指针与所有权](#56-智能指针与所有权)
+    - [5.6.1. 共享所有权`Rc<T>`和`Weak<T>`](#561-共享所有权rct和weakt)
+    - [5.6.2. 内部可变性Cell＜T＞和RefCell＜T＞](#562-内部可变性cellt和refcellt)
+      - [5.6.2.1. Cell＜T＞](#5621-cellt)
+      - [5.6.2.2. RefCell＜T＞](#5622-refcellt)
+    - [5.6.3. 写时复制Cow＜T＞ ？](#563-写时复制cowt-)
+  - [5.7. 并发安全与所有权](#57-并发安全与所有权)
+  - [5.8. 非词法作用域生命周期](#58-非词法作用域生命周期)
+  - [5.9. 小结](#59-小结)
 # 1. 新时代的语言
 # 2. 语言精要
 ## 2.1. Rust 语言的基本构成
@@ -1409,7 +1418,7 @@ pub trait Into<T> {
 ```
 - 对于类型T，如果它实现了From＜U＞，则可以通过T::from（u）来生成T类型的实例，此处u为U的类型实例
 - 对于类型T，如果它实现了Into＜U＞，则可以通过into方法来消耗自身转换为类型U的新实例
-  - 关于Into有一条默认的规则：如果类型U实现了From＜T＞，则T类型实例调用into方法就可以转换为类型U。这是因为Rust标准库内部有一个默认的实现
+  - **关于Into有一条默认的规则：如果类型U实现了From＜T＞，则T类型实例调用into方法就可以转换为类型U**。这是因为Rust标准库内部有一个默认的实现
     - `impl <T, U> Into<U> for T where U: From<T>`
       - 一般情况下，只需要实现From即可，除非From不容易实现，才需要考虑实现Into
   - 在标准库中，还包含了TryFrom和TryInto两种trait，是From和Into的错误处理版本，因为类型转换是有可能发生错误的，所以在需要进行错误处理的时候可以使用 TryFrom 和TryInto
@@ -1960,3 +1969,180 @@ fn main() {
       println!("Hello, world!");
   }
   ``` 
+  ## 5.6. 智能指针与所有权
+  - 智能指针和普通引用的区别之一就是所有权的不同
+    - `智能指针拥有资源的所有权，而普通引用只是对所有权的借用`
+  - Box
+    - 智能指针`Box<T>`独占所有权
+      ```rust
+      fn main() {
+          let x = Box::new("hello");
+          let y = x;
+          // println!("{:?}", x); // borrow of moved value: `x`
+      }
+      ``` 
+    - 解引用智能指针`Box<T>`
+      ```rust
+      fn main() {
+          let a = Box::new("hello"); //Box::new(str) str 是字面量 基础类型 Copy 按位复制
+          let b = Box::new("Rust".to_string()); // Box::new(String) String clone move
+          // *a和*b操作相当于*（a.deref）和*（b.deref）操作
+          let c = *a; // *a 解引用，得到 str，赋值给c，按位复制
+          let d = *b; // *b 解引用，得到 String，赋值给d，move
+          println!("{:?}", a);
+          // println!("{:?}", b); // b 所有的 String 已经被 move 了
+      }
+      ``` 
+      - 对于Box＜T＞类型来说，如果包含的类型T属于复制语义，则执行按位复制；如果属于移动语义，则移动所有权
+      - `目前支持解引用移动的智能指针只有Box＜T＞`
+        - Rc＜T＞或Arc＜T＞智能指针不支持解引用移动
+          ```rust
+          use std::rc::Rc;
+          use std::sync::Arc;
+          fn main() {
+              let r = Rc::new("Rust".to_string());
+              let a = Arc::new(vec![1.0, 2.0, 3.0]);
+              let b = Rc::new("Rust");
+              let c = Arc::new("hello");
+
+              // let x = *r; // cannot move out of an `Rc`
+              // let z = *a; // cannot move out of an `Arc`
+              let y = *b; // 按位复制的可以被解引用
+              let w = *c;
+          }
+          ``` 
+      - `Box<T>`源码实现
+        ```rust
+        #[lang = "owned_box"]
+        pub struct Box<T: ?Sized>(Unique<T>);
+        ```
+        - Box＜T＞标注了Lang Item为＂owned_box＂，编译器由此来识别Box＜T＞类型，因为Box＜T＞与原生类型不同，并不具备类型名称（比如 bool 这种），但它代表所有权唯一的智能指针的特殊性，所以需要使用Lang Item来专门识别，而其他的智能指针则不是这样的
+
+### 5.6.1. 共享所有权`Rc<T>`和`Weak<T>`
+- Rc＜T＞可以将多个所有权共享给多个变量，每当共享一个所有权时，计数就会增加一次，只有当计数为零，也就是当所有共享变量离开作用域时，该值才会被析构
+- Rc＜T＞主要用于希望共享堆上分配的数据可以供程序的多个部分读取的场景，并且主要确保共享的资源析构函数都能被调用到
+- Rc＜T＞是单线程引用计数指针，不是线程安全的类型，Rust也不允许它被传递或共享给别的线程
+  ```rust
+  use std::rc::Rc;
+
+  fn main() {
+      let x = Rc::new(45);
+      let y1 = x.clone(); // 通过clone方法共享的引用所有权被称为强引用。
+      let y2 = x.clone();
+      println!("{:?}", Rc::strong_count(&x)); // 3 分别调用了一次clone方法，其所有权就被共享了两次，加上原有的所有权 
+      let w = Rc::downgrade(&x); // downgrade方法创建了另外一种智能指针类型Weak＜T＞，它也是引用计数指针，属于Rc＜T＞的另一种版本，它共享的指针没有所有权，所以被称为弱引用 ，但 Weak＜T＞还保留对 Rc＜T＞中值的引用。
+      println!("{:?}", Rc::weak_count(&x));
+      let y3 = &*x; // 你增加计数
+      println!("{}", 100 - *x);
+      println!("{:?}", Rc::strong_count(&x));
+  }
+  ```
+- 利用Weak＜T＞解决循环引用的内存泄漏问题
+  ```rust
+  use std::rc::Rc;
+  use std::rc::Weak;
+  use std::cell::RefCell;
+  struct Node {
+      next: Option<Rc<RefCell<Node>>>,
+      head: Option<Weak<RefCell<Node>>>
+  }
+  impl Drop for Node {
+      fn drop(&mut self) {
+          println!("Dropping!");
+      }
+  }
+  fn main() {
+      let first = Rc::new(RefCell::new(Node{next: None, head: None}));
+      let second = Rc::new(RefCell::new(Node{next: None, head: None}));
+      let third = Rc::new(RefCell::new(Node{next: None, head: None}));
+      first.borrow_mut().next = Some(second.clone());
+      second.borrow_mut().next = Some(third.clone());
+      third.borrow_mut().head = Some(Rc::downgrade(&first));
+  }
+  ``` 
+
+### 5.6.2. 内部可变性Cell＜T＞和RefCell＜T＞
+- Rust 中的可变或不可变，是针对一个变量绑定而言的，比如对于结构体来说，可变或不可变只能对其实例进行设置，而不能设置单个成员的可变性。
+- Rust提供了Cell＜T＞和RefCell＜T＞，可以提供内部可变性（Interior Mutability）的容器
+#### 5.6.2.1. Cell＜T＞
+- 内部可变性实际上是Rust中的一种设计模式。内部可变性容器是对Struct的一种封装，表面不可变，但内部可以通过某种方法来改变里面的值
+```rust
+use std::cell::Cell;
+struct Foo {
+    x: u32,
+    y: Cell<u32>,
+}
+fn main() {
+    let foo = Foo {x: 1, y: Cell::new(3)};
+    assert_eq!(1, foo.x);
+    assert_eq!(3, foo.y.get());
+    foo.y.set(5);
+    assert_eq!(5, foo.y.get());
+}
+```
+- Cell＜T＞通过对外暴露的 set/get方法实现了对内部值的修改，而其本身却是不可变的
+  - 实际上Cell＜T＞包裹的T本身合法地避开了借用检查。
+- 包裹在Cell＜T＞中的类型T，只有实现了Copy的类型T，才可以使用get方法获取包裹的值，因为get方法返回的是对内部值的复制
+- 没有实现Copy的类型T，则提供了get_mut方法来返回可变借用，依然遵循Rust的借用检查规则
+- 任何类型T都可以使用set方法修改其包裹的值
+
+#### 5.6.2.2. RefCell＜T＞
+- 对于没有实现 Copy 的类型，使用Cell＜T＞有许多不便。Rust 提供的RefCell＜T＞适用的范围更广，对类型T并没有Copy的限制
+  ```rust
+  use std::cell::RefCell;
+
+  fn main() {
+      let x = RefCell::new(vec![1, 2, 3, 4]);
+      println!("{:?}", x.borrow());
+      x.borrow_mut().push(5);
+      println!("{:?}", x.borrow());
+  }
+  ```
+- RefCell＜T＞提供了borrow/borrow_mut方法，对应Cell＜T＞的get/set方法
+- RefCell＜T＞虽然没有分配空间，但它是**有运行时开销**的，因为它自己维护着一个运行时借用检查器，如果在运行时出现了违反借用规则的情况，比如持有多个可变借用，则会引发线程panic
+  ```rust
+  use std::cell::RefCell;
+  fn main() {
+      let x = RefCell::new(vec![1, 2, 3, 4]);
+      let mut mut_v = x.borrow_mut();
+      mut_v.push(5);
+
+      // let mut mut_v2 = x.borrow_mut(); // thread 'main' panicked at 'already borrowed: BorrowMutError', src/main.rs:7:24
+  }
+  ``` 
+- Cell＜T＞和RefCell＜T＞使用最多的场景就是配合只读引用来使用，比如&T或Rc＜T＞
+- Cell＜T＞和RefCell＜T＞之间的区别可以总结如下
+  - Cell＜T＞一般适合复制语义类型（实现了Copy），RefCell＜T＞一般适合移动语义类型（未实现Copy）
+  - Cell＜T＞无运行时开销，并且永远不会在运行时引发panic错误。RefCell＜T＞需要在运行时执行借用检查，所以有运行时开销，一旦发现违反借用规则的情况，则会引发线程panic而退出当前线程
+
+### 5.6.3. 写时复制Cow＜T＞ ？
+- 写时复制（Copy on Write）技术是一种程序中的优化策略，比如Linux中父进程创建子进程时，并不是立刻让子进程复制一份进程空间，而是先让子进程共享父进程的进程空间，只有等到子进程真正需要写入的时候才复制进程空间。这种“拖延”技术实际上很好地减少了开销
+- Cow＜T＞是一个**枚举体的智能指针**，包括两个可选值
+  - Borrowed，用于包裹引用
+  - Owned，用于包裹所有者
+- 跟Option＜T＞类型有点相似，Option＜T＞表示的是值的“有”和“无”，而 Cow＜T＞表示的是所有权的“借用”和“拥有”
+- Cow＜T＞提供的功能：
+  - 以不可变的方式访问借用内容，
+  - 以及在需要可变借用或所有权的时候再克隆一份数据。
+  - Cow＜T＞实现了Deref，这意味着可以直接调用其包含数据的不可变方法。
+- Cow＜T＞旨在减少复制操作，提高性能，一般用于读多写少的场景
+  ```rust
+
+  ``` 
+- Cow＜T＞实现了Deref，所以可以直接调用T的不可变方法
+- 在需要修改 T 时，可以使用 to_mut 方法来获取可变借用。该方法会产生克隆，但仅克隆一次，如果多次调用，则只会使用第一次的克隆对象。如果T本身拥有所有权，则此时调用to_mut不会发生克隆。
+- 在需要修改T时，也可以使用into_owned方法来获取一个拥有所有权的对象。如果T是借用类型，这个过程会发生克隆，并创建新的所有权对象。如果T是所有权对象，则会将所有权转移到新的克隆对象
+- Cow＜T＞的另一个用处是统一实现规范。比如现在需要设计一个结构体 Token，用来存放网络上的各种token数据，但是这些token不都是字符串字面量，还可能是动态生成的值。到底该用&str类型还是String类型呢？为了寻求统一，这里使用了Cow＜T＞
+
+## 5.7. 并发安全与所有权
+- 如果类型 T 实现了 Send，就是告诉编译器该类型的实例可以在线程间安全传递所有权
+- 如果类型T实现了Sync，就是向编译器表明该类型的实例在多线程并发中不可能导致内存不安全，所以可以安全地跨线程共享
+- Rust提供了一些线程安全的同步机制，比如Arc＜T＞、Mutex＜T＞、RewLock＜T＞和Atomic系列类型
+  - Arc＜T＞是线程安全版本的Rc＜T＞
+  - Mutex＜T＞是锁，同一时间仅允许有一个线程进行操作
+  - RwLock＜T＞相当于线程安全版本的RefCell＜T＞，同时运行多个reader或者一个writer
+  - Atomic 系列类型包括AtomicBool、AtomicIsize、AtomicUsize和AtomicPtr这4种，虽然比较少，但是可以用 AtomicPtr 来模拟其他想要的类型，它相当于线程安全版本的Cell＜T＞
+
+## 5.8. 非词法作用域生命周期
+- Rust团队在Rust 2018版本中引入了非词法作用域生命周期（Non-Lexical Lifetime，NLL），改善生命周期的检查
+## 5.9. 小结
